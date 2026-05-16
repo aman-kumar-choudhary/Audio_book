@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audiobook Pipeline — {% block title %}Home{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,600;0,7..72,700;1,7..72,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        brand: ['Literata', 'Georgia', 'serif'],
+                        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', system-ui, sans-serif;
+            background-color: #080c12;
+            min-height: 100vh;
+        }
+
+        /* Dot grid overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle at 1px 1px, rgba(148,163,184,0.05) 1px, transparent 0);
+            background-size: 28px 28px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Ambient top glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70%;
+            height: 60%;
+            background: radial-gradient(ellipse, rgba(245,158,11,0.05) 0%, transparent 65%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        main, nav, footer { position: relative; z-index: 1; }
+
+        /* Status badges */
+        .status-uploaded  { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+        .status-extracting{ background: rgba(234,179,8,0.12);  color: #fbbf24; border: 1px solid rgba(234,179,8,0.25); }
+        .status-cleaning  { background: rgba(234,179,8,0.12);  color: #fbbf24; border: 1px solid rgba(234,179,8,0.25); }
+        .status-preview   { background: rgba(249,115,22,0.12); color: #fb923c; border: 1px solid rgba(249,115,22,0.25); }
+        .status-tts       { background: rgba(6,182,212,0.12);  color: #22d3ee; border: 1px solid rgba(6,182,212,0.25); }
+        .status-done      { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+        .status-failed    { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+        .status-cancelled { background: rgba(107,114,128,0.12);color: #9ca3af; border: 1px solid rgba(107,114,128,0.25); }
+
+        .job-status-badge, .status-badge-large {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: capitalize;
+            letter-spacing: 0.03em;
+        }
+
+        /* Shared card style */
+        .glass-card {
+            background: rgba(15, 20, 30, 0.7);
+            border: 1px solid rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 1rem;
+        }
+
+        /* Progress shimmer */
+        .progress-fill {
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #10b981);
+            border-radius: 9999px;
+            transition: width 0.4s ease;
+        }
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+            animation: shimmer 1.8s infinite;
+        }
+
+        @keyframes shimmer {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+
+        /* Toast system */
+        .toast-container {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1rem;
+            border-radius: 0.75rem;
+            min-width: 300px;
+            max-width: 400px;
+            animation: slideInRight 0.3s ease-out;
+            background: #111827;
+            border: 1px solid rgba(51,65,85,0.6);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .toast.success { border-left: 3px solid #10b981; }
+        .toast.error   { border-left: 3px solid #ef4444; }
+        .toast.warning { border-left: 3px solid #f59e0b; }
+        .toast.info    { border-left: 3px solid #6366f1; }
+        .toast-icon    { font-size: 1.2rem; flex-shrink: 0; }
+        .toast.success .toast-icon { color: #34d399; }
+        .toast.error   .toast-icon { color: #f87171; }
+        .toast.warning .toast-icon { color: #fbbf24; }
+        .toast.info    .toast-icon { color: #818cf8; }
+        .toast-content { flex: 1; }
+        .toast-title   { font-weight: 600; font-size: 0.875rem; color: #f1f5f9; margin-bottom: 0.15rem; }
+        .toast-message { font-size: 0.8rem; color: #94a3b8; }
+        .toast-close   { background: none; border: none; color: #475569; cursor: pointer; font-size: 1rem; padding: 0.2rem; line-height: 1; transition: color 0.15s; }
+        .toast-close:hover { color: #94a3b8; }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to   { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(16px); opacity: 0; }
+            to   { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        .animate-slide-in { animation: slideUp 0.35s ease-out forwards; }
+        .animate-fade-in  { animation: fadeIn 0.3s ease-out forwards; }
+
+        /* Nav link hover line */
+        .nav-link { position: relative; }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -3px; left: 0;
+            width: 0; height: 1.5px;
+            background: linear-gradient(90deg, #f59e0b, #10b981);
+            transition: width 0.22s ease;
+        }
+        .nav-link:hover::after { width: 100%; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #080c12; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        /* Dark form inputs */
+        input, select, textarea {
+            background: rgba(15, 20, 30, 0.8);
+            color: #e2e8f0;
+            border: 1px solid rgba(51,65,85,0.5);
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            font-family: 'DM Sans', system-ui, sans-serif;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            width: 100%;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(245,158,11,0.5);
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.08);
+        }
+        select option { background: #111827; }
+        input[type="range"] {
+            padding: 0;
+            height: auto;
+            background: transparent;
+            border: none;
+            accent-color: #f59e0b;
+        }
+        input[type="checkbox"] {
+            width: auto;
+            height: auto;
+            accent-color: #f59e0b;
+        }
+        input[type="file"] {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+        textarea { resize: vertical; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="text-slate-200 antialiased">
+
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 bg-[#080c12]/85 backdrop-blur-xl border-b border-slate-800/50 shadow-2xl shadow-black/30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-13" style="height:52px;">
+            <a href="{{ url_for('index') }}" class="flex items-center gap-2 group no-underline">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 group-hover:scale-110" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);">
+                    <i class="fas fa-book-open text-amber-400" style="font-size:0.7rem;"></i>
+                </div>
+                <span class="font-brand font-semibold text-sm tracking-wide" style="background:linear-gradient(135deg,#f59e0b,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                    Audiobook Pipeline
+                </span>
+            </a>
+            <div class="flex items-center gap-5">
+                <a href="{{ url_for('index') }}" class="nav-link text-slate-400 hover:text-amber-400 transition-colors duration-200 text-xs font-medium flex items-center gap-1.5 no-underline" style="text-decoration:none;">
+                    <i class="fas fa-home opacity-70"></i> Home
+                </a>
+                <a href="{{ url_for('dashboard') }}" class="nav-link text-slate-400 hover:text-amber-400 transition-colors duration-200 text-xs font-medium flex items-center gap-1.5 no-underline" style="text-decoration:none;">
+                    <i class="fas fa-chart-pie opacity-70"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 mt-10 border-t py-4 text-center" style="border-color:rgba(30,41,59,0.5);">
+        <p class="text-xs flex items-center justify-center gap-2" style="color:#334155;">
+            <i class="fas fa-book" style="color:rgba(245,158,11,0.4);"></i>
+            &copy; 2026 Audiobook Pipeline — Made for books
+        </p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

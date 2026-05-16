@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Conda / environments
+env/
+venv/
+.conda/
+
+# AI models
+models/
+*.pt
+*.pth
+*.ckpt
+*.bin
+
+# Generated outputs
+outputs/
+temp/
+uploads/
+
+# Audio / video
+*.wav
+*.mp3
+*.mp4
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+.env

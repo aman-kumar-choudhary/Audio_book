@@ -1,0 +1,165 @@
+# =============================================================================
+# Audiobook Pipeline — Docker Compose
+#
+# Services:
+#   nginx      → public entry point  (ports 80 / 443)
+#   app        → Flask + Gunicorn    (internal :5000)
+#   kokoro     → Kokoro-FastAPI GPU  (internal :8880)
+#   kokoro-cpu → Kokoro-FastAPI CPU  (internal :8881, fallback)
+#   mongo      → MongoDB 6           (internal :27017)
+#
+# Usage:
+#   cp .env.example .env   # fill in your keys
+#   docker compose up -d --build
+# =============================================================================
+
+services:
+
+  # ── Nginx reverse proxy ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: audiobook_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro          # place your certs here for HTTPS
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - audiobook_net
+
+  # ── Flask application ───────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: audiobook_app:latest
+    container_name: audiobook_app
+    restart: unless-stopped
+    environment:
+      # MongoDB
+      MONGO_URI: "mongodb://mongo:27017/"
+      MONGO_DB:  "${MONGO_DB:-audiobook_pipeline}"
+
+      # LLM
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      GEMINI_API_KEY:     "${GEMINI_API_KEY:-}"
+
+      # Kokoro — GPU primary, CPU fallback
+      KOKORO_API_URL: "http://kokoro:8880"
+      KOKORO_CPU_URL: "http://kokoro-cpu:8881"
+
+      # Flask
+      SECRET_KEY: "${SECRET_KEY:-change-me-in-production}"
+
+      # GPU
+      CUDA_VISIBLE_DEVICES:  "${CUDA_VISIBLE_DEVICES:-0}"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    volumes:
+      - app_uploads:/app/uploads
+      - app_outputs:/app/outputs
+      - app_temp:/app/temp
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kokoro:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - audiobook_net
+
+  # ── Kokoro-FastAPI — GPU (primary TTS) ──────────────────────────────────────
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    container_name: audiobook_kokoro_gpu
+    restart: unless-stopped
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - kokoro_models:/app/models    # cache model weights across restarts
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8880/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s      # model loading takes a while on first run
+      retries: 15
+    networks:
+      - audiobook_net
+
+  # ── Kokoro-FastAPI — CPU (fallback TTS) ─────────────────────────────────────
+  kokoro-cpu:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: audiobook_kokoro_cpu
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8881/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 12
+    networks:
+      - audiobook_net
+
+  # ── MongoDB ─────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:6
+    container_name: audiobook_mongo
+    restart: unless-stopped
+    environment:
+      # Uncomment to enable auth:
+      # MONGO_INITDB_ROOT_USERNAME: "${MONGO_USER:-admin}"
+      # MONGO_INITDB_ROOT_PASSWORD: "${MONGO_PASS:-changeme}"
+      MONGO_INITDB_DATABASE: "${MONGO_DB:-audiobook_pipeline}"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    networks:
+      - audiobook_net
+
+# ─── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+  mongo_config:
+  kokoro_models:
+  app_uploads:
+  app_outputs:
+  app_temp:
+  nginx_logs:
+
+# ─── Network ───────────────────────────────────────────────────────────────────
+networks:
+  audiobook_net:
+    driver: bridge

@@ -1,0 +1,36 @@
+# ─── Web framework ────────────────────────────────────────────────────────────
+Flask==2.3.3
+flask-pymongo==2.3.0
+pymongo==4.5.0
+
+# ─── HTTP ─────────────────────────────────────────────────────────────────────
+requests==2.31.0
+urllib3==2.0.7
+aiohttp>=3.9.0
+
+# ─── AI / LLM ─────────────────────────────────────────────────────────────────
+google-generativeai==0.3.0
+torch>=2.0.0
+
+# ─── NLP ──────────────────────────────────────────────────────────────────────
+# NOTE: NLTK data (punkt / punkt_tab) cannot be installed via pip.
+# Run this ONCE after installing requirements:
+#
+#   python -m nltk.downloader punkt punkt_tab
+#
+# chunker.py will also attempt a timed auto-download on first run.
+nltk==3.8.1
+
+# ─── Audio / Video ────────────────────────────────────────────────────────────
+pydub==0.25.1
+soundfile==0.12.1
+ffmpeg-python==0.2.0
+
+# ─── Image ────────────────────────────────────────────────────────────────────
+Pillow==10.1.0
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv==1.0.0
+shortuuid==1.0.11
+numpy==1.24.3
+loguru>=0.7.0          # required by Kokoro-FastAPI internals

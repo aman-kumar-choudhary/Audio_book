@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Stat card glow on hover */
+    .stat-card-glow:hover { box-shadow: 0 0 24px rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2) !important; }
+
+    /* Table rows */
+    #jobsTableBody tr { transition: background 0.15s; }
+    #jobsTableBody tr:hover td { background: rgba(30,41,59,0.3); }
+
+    /* Action buttons */
+    .action-btn {
+        padding: 0.3rem 0.65rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: all 0.15s;
+        text-decoration: none;
+        border: 1px solid transparent;
+        cursor: pointer;
+    }
+    .btn-view     { background:rgba(99,102,241,0.15); color:#a5b4fc; border-color:rgba(99,102,241,0.25); }
+    .btn-view:hover { background:rgba(99,102,241,0.25); transform:translateY(-1px); }
+    .btn-preview  { background:rgba(249,115,22,0.15); color:#fb923c; border-color:rgba(249,115,22,0.25); }
+    .btn-preview:hover { background:rgba(249,115,22,0.25); transform:translateY(-1px); }
+    .btn-download { background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.25); }
+    .btn-download:hover { background:rgba(16,185,129,0.25); transform:translateY(-1px); }
+    .btn-retry    { background:rgba(239,68,68,0.15);  color:#f87171; border-color:rgba(239,68,68,0.25); }
+    .btn-retry:hover { background:rgba(239,68,68,0.25); transform:translateY(-1px); }
+
+    /* Table progress bar */
+    .mini-progress-track {
+        width: 100%;
+        height: 4px;
+        background: rgba(30,41,59,0.8);
+        border-radius: 9999px;
+        overflow: hidden;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Refresh spinner */
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
+
+    /* Empty state */
+    .empty-state td {
+        text-align: center;
+        padding: 3.5rem 2rem;
+        color: #334155;
+    }
+
+    /* Filter inputs */
+    .filter-select, .search-input {
+        background: rgba(12,17,27,0.8);
+        border: 1px solid rgba(51,65,85,0.4);
+        border-radius: 0.5rem;
+        color: #cbd5e1;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.82rem;
+        transition: border-color 0.15s;
+    }
+    .filter-select:focus, .search-input:focus {
+        outline: none;
+        border-color: rgba(245,158,11,0.4);
+    }
+    .search-input { flex: 1; min-width: 180px; }
+    .filter-select { min-width: 140px; }
+
+    /* Fade-in rows */
+    @keyframes rowIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    #jobsTableBody tr { animation: rowIn 0.25s ease-out both; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-slide-in">
+
+    <!-- Page Header + Stats -->
+    <div class="glass-card p-5 mb-5" style="background:linear-gradient(135deg,rgba(15,20,30,0.9),rgba(10,15,25,0.95));border-left:2px solid rgba(245,158,11,0.35);">
+        <div class="flex items-start justify-between mb-5 gap-4 flex-wrap">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(16,185,129,0.1));border:1px solid rgba(245,158,11,0.25);">
+                    <i class="fas fa-chart-pie text-amber-400 text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="font-brand font-semibold text-xl text-slate-100 leading-tight">Global Dashboard</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">Monitor all your audiobook jobs in one place</p>
+                </div>
+            </div>
+            <a href="{{ url_for('index') }}" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:#fbbf24;padding:0.45rem 0.9rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;text-decoration:none;transition:all 0.15s;" onmouseover="this.style.background='rgba(245,158,11,0.18)'" onmouseout="this.style.background='rgba(245,158,11,0.1)'">
+                <i class="fas fa-plus" style="font-size:0.7rem;"></i> New Upload
+            </a>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="statsOverview">
+            <div class="stat-card-glow rounded-xl p-3.5 transition-all duration-200 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(51,65,85,0.3);">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.2);">
+                        <i class="fas fa-tasks text-indigo-400" style="font-size:0.75rem;"></i>
+                    </div>
+                    <div>
+                        <div id="totalJobs" class="font-brand font-bold text-xl text-slate-100">0</div>
+                        <div class="text-slate-500" style="font-size:0.7rem;">Total</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-glow rounded-xl p-3.5 transition-all duration-200 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(51,65,85,0.3);">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.2);">
+                        <i class="fas fa-play-circle text-amber-400" style="font-size:0.75rem;"></i>
+                    </div>
+                    <div>
+                        <div id="activeJobs" class="font-brand font-bold text-xl text-slate-100">0</div>
+                        <div class="text-slate-500" style="font-size:0.7rem;">Active</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-glow rounded-xl p-3.5 transition-all duration-200 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(51,65,85,0.3);">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.2);">
+                        <i class="fas fa-check-circle text-emerald-400" style="font-size:0.75rem;"></i>
+                    </div>
+                    <div>
+                        <div id="completedJobs" class="font-brand font-bold text-xl text-slate-100">0</div>
+                        <div class="text-slate-500" style="font-size:0.7rem;">Done</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-glow rounded-xl p-3.5 transition-all duration-200 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(51,65,85,0.3);">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.2);">
+                        <i class="fas fa-exclamation-circle text-red-400" style="font-size:0.75rem;"></i>
+                    </div>
+                    <div>
+                        <div id="failedJobs" class="font-brand font-bold text-xl text-slate-100">0</div>
+                        <div class="text-slate-500" style="font-size:0.7rem;">Failed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="glass-card px-4 py-3 mb-4 flex flex-wrap gap-2.5 items-center">
+        <select class="filter-select" id="statusFilter">
+            <option value="all">All Status</option>
+            <option value="uploaded">Uploaded</option>
+            <option value="extracting">Extracting</option>
+            <option value="cleaning">Cleaning</option>
+            <option value="preview">Preview</option>
+            <option value="tts">TTS</option>
+            <option value="done">Done</option>
+            <option value="failed">Failed</option>
+        </select>
+
+        <input type="text" class="search-input" id="searchInput" placeholder="Search by filename…" oninput="filterJobs()">
+
+        <button onclick="filterJobs()" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;padding:0.45rem 0.85rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(99,102,241,0.25)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
+            <i class="fas fa-filter" style="font-size:0.7rem;"></i> Filter
+        </button>
+
+        <button onclick="refreshJobs()" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(30,41,59,0.5);border:1px solid rgba(51,65,85,0.35);color:#64748b;padding:0.45rem 0.85rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#64748b'">
+            <i class="fas fa-sync-alt" style="font-size:0.7rem;"></i> Refresh
+        </button>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="glass-card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem;" id="jobsTable">
+                <thead>
+                    <tr style="background:rgba(10,15,25,0.6);border-bottom:1px solid rgba(30,41,59,0.8);">
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Filename</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Status</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;min-width:140px;">Progress</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Chunks</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Voice</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Created</th>
+                        <th style="text-align:left;padding:0.75rem 1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="jobsTableBody">
+                    <tr class="empty-state">
+                        <td colspan="7">
+                            <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;color:#1e293b;">
+                                <i class="fas fa-inbox" style="font-size:2.5rem;color:#111827;"></i>
+                                <div>
+                                    <p style="font-weight:600;color:#334155;margin-bottom:0.25rem;">No jobs found</p>
+                                    <p style="font-size:0.78rem;">Upload some files to get started</p>
+                                </div>
+                                <a href="{{ url_for('index') }}" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:#fbbf24;padding:0.5rem 1.1rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;text-decoration:none;margin-top:0.25rem;">
+                                    <i class="fas fa-upload" style="font-size:0.7rem;"></i> Upload Files
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Refresh Indicator -->
+<div id="refreshIndicator" style="display:none;position:fixed;bottom:1.25rem;right:1.25rem;z-index:50;background:#111827;border:1px solid rgba(51,65,85,0.5);border-radius:9999px;padding:0.5rem 1rem;display:none;align-items:center;gap:0.5rem;font-size:0.78rem;color:#64748b;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+    <i class="fas fa-sync-alt spin" style="font-size:0.7rem;color:#f59e0b;"></i>
+    <span>Updating…</span>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    (function() {
+        let jobs = [];
+        let pollInterval;
+        let isRefreshing = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadJobs();
+            startPolling();
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+
+        function startPolling() {
+            pollInterval = setInterval(loadJobs, 3000);
+        }
+
+        function loadJobs() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            const indicator = document.getElementById('refreshIndicator');
+            if (indicator) indicator.style.display = 'flex';
+
+            fetch('/api/jobs/all')
+                .then(r => r.json())
+                .then(data => { jobs = data; updateStats(); filterJobs(); })
+                .catch(err => console.error('Error loading jobs:', err))
+                .finally(() => {
+                    isRefreshing = false;
+                    if (indicator) indicator.style.display = 'none';
+                });
+        }
+
+        function updateStats() {
+            const total     = jobs.length;
+            const active    = jobs.filter(j => !['done','failed'].includes(j.status)).length;
+            const completed = jobs.filter(j => j.status === 'done').length;
+            const failed    = jobs.filter(j => j.status === 'failed').length;
+            document.getElementById('totalJobs').textContent     = total;
+            document.getElementById('activeJobs').textContent    = active;
+            document.getElementById('completedJobs').textContent = completed;
+            document.getElementById('failedJobs').textContent    = failed;
+        }
+
+        function filterJobs() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchTerm   = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = jobs;
+            if (statusFilter !== 'all') filtered = filtered.filter(j => j.status === statusFilter);
+            if (searchTerm) filtered = filtered.filter(j => (j.filename||'').toLowerCase().includes(searchTerm));
+            renderJobs(filtered);
+        }
+
+        function renderJobs(jobsToRender) {
+            const tbody = document.getElementById('jobsTableBody');
+
+            if (!jobsToRender || jobsToRender.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="empty-state">
+                        <td colspan="7">
+                            <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;color:#1e293b;padding:3rem 2rem;">
+                                <i class="fas fa-search" style="font-size:2rem;color:#111827;"></i>
+                                <p style="color:#334155;font-size:0.85rem;">No jobs match your filters</p>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            let html = '';
+            jobsToRender.forEach((job, idx) => {
+                const created   = job.created_at ? new Date(job.created_at).toLocaleString() : '—';
+                const filename  = job.filename || job.original_filename || 'Unknown';
+                const chunks    = (job.status === 'cleaning')
+                    ? `<span style="font-size:0.65rem;color:#818cf8;display:block;margin-bottom:0.1rem;">LLM</span>${job.chunks_done||0}/${job.total_chunks||0}`
+                    : (job.status === 'tts')
+                    ? `<span style="font-size:0.65rem;color:#34d399;display:block;margin-bottom:0.1rem;">TTS</span>${job.chunks_done||0}/${job.total_chunks||0}`
+                    : `${job.chunks_done||0}/${job.total_chunks||0}`;
+                const progress  = job.progress || 0;
+                const delay     = idx * 30;
+
+                html += `
+                <tr style="border-bottom:1px solid rgba(15,20,30,0.8);animation-delay:${delay}ms;">
+                    <td style="padding:0.75rem 1rem;max-width:200px;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <i class="fas fa-file-alt" style="color:rgba(245,158,11,0.5);font-size:0.75rem;flex-shrink:0;"></i>
+                            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1;">${escapeHtml(filename)}</span>
+                        </div>
+                    </td>
+                    <td style="padding:0.75rem 1rem;">
+                        <span class="job-status-badge status-${job.status}">${job.status}</span>
+                    </td>
+                    <td style="padding:0.75rem 1rem;min-width:140px;">
+                        <div class="mini-progress-track">
+                            <div class="progress-fill" style="width:${progress}%;"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#475569;margin-top:0.2rem;">
+                            <span style="font-family:'JetBrains Mono',monospace;">${progress}%</span>
+                            <span style="white-space:nowrap;overflow:hidden;max-width:80px;text-overflow:ellipsis;">${job.message||''}</span>
+                        </div>
+                    </td>
+                    <td style="padding:0.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#64748b;">${chunks}</td>
+                    <td style="padding:0.75rem 1rem;color:#64748b;font-size:0.78rem;">${job.voice||'Default'}</td>
+                    <td style="padding:0.75rem 1rem;color:#475569;font-size:0.75rem;white-space:nowrap;">${created}</td>
+                    <td style="padding:0.75rem 1rem;">
+                        <div class="job-actions" style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                            ${job.status === 'preview' ? `<a href="/preview/${job.id}" class="action-btn btn-preview"><i class="fas fa-eye" style="font-size:0.65rem;"></i> Preview</a>` : ''}
+                            <a href="/status/${job.id}" class="action-btn btn-view"><i class="fas fa-info-circle" style="font-size:0.65rem;"></i> Details</a>
+                            ${!['done','failed','cancelled'].includes(job.status) ? `<button class="action-btn" style="background:rgba(249,115,22,0.15);color:#fb923c;border:1px solid rgba(249,115,22,0.25);" onclick="cancelJob('${job.id}')"><i class="fas fa-stop-circle" style="font-size:0.65rem;"></i> Cancel</button>` : ''}
+                            ${job.status === 'done' ? `
+                                <a href="/api/job/${job.id}/output/audio" class="action-btn btn-download"><i class="fas fa-headphones" style="font-size:0.65rem;"></i> Audio</a>
+                                ${job.generate_video ? `<a href="/api/job/${job.id}/output/video" class="action-btn btn-download"><i class="fas fa-video" style="font-size:0.65rem;"></i> Video</a>` : ''}
+                            ` : ''}
+                            <button class="action-btn btn-retry" style="background:rgba(239,68,68,0.12);color:#f87171;border-color:rgba(239,68,68,0.25);" onclick="deleteJob('${job.id}')"><i class="fas fa-trash" style="font-size:0.65rem;"></i></button>
+                            ${job.status === 'failed' ? `<button class="action-btn btn-retry" onclick="retryJob('${job.id}')"><i class="fas fa-redo" style="font-size:0.65rem;"></i> Retry</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.id = 'toast-' + Date.now();
+            const icons = { success:'fa-check-circle', error:'fa-exclamation-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+            toast.innerHTML = `<div class="toast-icon"><i class="fas ${icons[type]||icons.info}"></i></div><div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${message}</div></div><button class="toast-close" onclick="this.closest('.toast').remove()"><i class="fas fa-times"></i></button>`;
+            container.appendChild(toast);
+            setTimeout(() => { const t = document.getElementById(toast.id); if(t){ t.style.animation='slideInRight 0.3s reverse'; setTimeout(()=>t.remove(),300); } }, 5000);
+        }
+
+        window.filterJobs  = filterJobs;
+        window.refreshJobs = function() { loadJobs(); };
+
+        window.retryJob = function(jobId) {
+            if (!confirm('Retry this job?')) return;
+            fetch(`/api/job/${jobId}/retry`, { method:'POST' })
+                .then(r => r.json())
+                .then(data => { showToast(data.status==='ok'?'Restarted':'Error', data.status==='ok'?'Processing restarted':data.error||'Failed', data.status==='ok'?'success':'error'); loadJobs(); })
+                .catch(err => showToast('Error', err.message, 'error'));
+        };
+
+        window.cancelJob = function(jobId) {
+            if (!confirm('Cancel this job?')) return;
+            fetch(`/api/job/${jobId}/cancel`, { method:'POST', headers:{'Content-Type':'application/json'} })
+                .then(r => r.json())
+                .then(data => { showToast(data.status==='ok'?'Cancelled':'Error', data.status==='ok'?'Job cancelled':data.error||'Failed', data.status==='ok'?'warning':'error'); loadJobs(); })
+                .catch(err => showToast('Error', err.message, 'error'));
+        };
+
+        window.deleteJob = function(jobId) {
+            if (!confirm('Delete this job? All files will be permanently removed.')) return;
+            fetch(`/api/job/${jobId}/delete`, { method:'DELETE' })
+                .then(r => r.json())
+                .then(data => { showToast(data.status==='ok'?'Deleted':'Error', data.status==='ok'?'Job deleted':data.error||'Failed', data.status==='ok'?'success':'error'); loadJobs(); })
+                .catch(err => showToast('Error', err.message, 'error'));
+        };
+    })();
+</script>
+{% endblock %}

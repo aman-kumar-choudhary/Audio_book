@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Job Status{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes pulseGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+        50%       { box-shadow: 0 0 16px 4px rgba(245,158,11,0.08); }
+    }
+    .pulse-glow { animation: pulseGlow 2.5s ease-in-out infinite; }
+
+    .metric-card { transition: transform 0.2s, border-color 0.2s; }
+    .metric-card:hover { transform: translateY(-2px); border-color: rgba(245,158,11,0.2) !important; }
+
+    /* Big progress bar */
+    .progress-bar-large {
+        width: 100%;
+        height: 12px;
+        background: rgba(15,20,30,0.9);
+        border-radius: 9999px;
+        overflow: hidden;
+        border: 1px solid rgba(30,41,59,0.8);
+    }
+    .progress-fill-large {
+        height: 100%;
+        background: linear-gradient(90deg, #f59e0b, #10b981);
+        border-radius: 9999px;
+        transition: width 0.5s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .progress-fill-large::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+        animation: shimmer 1.8s infinite;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.625rem 0;
+        border-bottom: 1px solid rgba(15,20,30,0.8);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { font-size: 0.8rem; color: #475569; }
+    .detail-value { font-size: 0.85rem; font-weight: 600; color: #cbd5e1; text-align: right; }
+
+    /* Download button */
+    .btn-dl {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.625rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.18s;
+        border: 1px solid transparent;
+    }
+    .btn-dl-audio { background: rgba(16,185,129,0.15); color: #34d399; border-color: rgba(16,185,129,0.3); }
+    .btn-dl-audio:hover { background: rgba(16,185,129,0.25); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(16,185,129,0.15); }
+    .btn-dl-video { background: rgba(99,102,241,0.15); color: #a5b4fc; border-color: rgba(99,102,241,0.3); }
+    .btn-dl-video:hover { background: rgba(99,102,241,0.25); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(99,102,241,0.15); }
+
+    /* Done section celebration */
+    @keyframes successPop {
+        0%   { transform: scale(0.9); opacity: 0; }
+        60%  { transform: scale(1.02); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    #downloadSection { animation: successPop 0.4s ease-out both; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-slide-in max-w-2xl mx-auto">
+
+    <!-- Header -->
+    <div class="glass-card p-5 mb-4" style="background:linear-gradient(135deg,rgba(12,17,27,0.9),rgba(8,12,20,0.95));border-left:2px solid rgba(245,158,11,0.4);">
+        <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(16,185,129,0.1));border:1px solid rgba(245,158,11,0.25);">
+                    <i class="fas fa-chart-bar text-amber-400 text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="font-brand font-semibold text-xl text-slate-100 leading-tight">Job Status</h1>
+                    <div class="font-mono text-xs mt-0.5 px-2 py-0.5 rounded inline-block" style="background:rgba(15,20,30,0.8);color:#475569;border:1px solid rgba(30,41,59,0.5);">
+                        {{ job.id }}
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                {% if job.status == 'preview' %}
+                <a href="/preview/{{ job.id }}" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);color:#fb923c;padding:0.45rem 0.875rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;text-decoration:none;">
+                    <i class="fas fa-eye" style="font-size:0.7rem;"></i> Preview & Edit
+                </a>
+                {% endif %}
+                <a href="{{ url_for('dashboard') }}" style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(30,41,59,0.5);border:1px solid rgba(51,65,85,0.35);color:#64748b;padding:0.45rem 0.875rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;text-decoration:none;">
+                    <i class="fas fa-arrow-left" style="font-size:0.7rem;"></i> Back
+                </a>
+            </div>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="statusGrid">
+            <div class="metric-card rounded-xl p-3 cursor-default status-grid" style="background:rgba(10,15,25,0.7);border:1px solid rgba(30,41,59,0.6);">
+                <div style="font-size:0.7rem;color:#475569;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
+                    <i class="fas fa-info-circle" style="color:rgba(245,158,11,0.4);"></i> Status
+                </div>
+                <div>
+                    <span class="status-badge status-{{ job.status }} status-badge-large">{{ job.status }}</span>
+                </div>
+            </div>
+            <div class="metric-card rounded-xl p-3 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(30,41,59,0.6);">
+                <div style="font-size:0.7rem;color:#475569;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
+                    <i class="fas fa-percent" style="color:rgba(245,158,11,0.4);"></i> Progress
+                </div>
+                <div class="progress-percent font-brand font-bold text-xl text-slate-100">{{ job.progress or 0 }}%</div>
+            </div>
+            <div class="metric-card rounded-xl p-3 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(30,41,59,0.6);">
+                <div style="font-size:0.7rem;color:#475569;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
+                    <i class="fas fa-layer-group" style="color:rgba(245,158,11,0.4);"></i>
+                    <span id="chunkLabel">Chunks</span>
+                </div>
+                <div class="font-brand font-bold text-xl text-slate-100">
+                    <span id="chunksDone">{{ job.chunks_done or 0 }}</span><span style="font-size:0.9rem;color:#334155;">/<span id="totalChunks">{{ job.total_chunks or 0 }}</span></span>
+                </div>
+            </div>
+            <div class="metric-card time-metric rounded-xl p-3 cursor-default" style="background:rgba(10,15,25,0.7);border:1px solid rgba(30,41,59,0.6);">
+                <div style="font-size:0.7rem;color:#475569;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
+                    <i class="fas fa-microphone" style="color:rgba(245,158,11,0.4);"></i> Voice
+                </div>
+                <div class="font-mono text-sm text-slate-300">{{ job.voice or 'Default' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="glass-card p-5 mb-4 pulse-glow">
+        <div class="flex items-center justify-between mb-3">
+            <h3 style="font-size:0.75rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#475569;display:flex;align-items:center;gap:0.4rem;">
+                <i class="fas fa-wave-square" style="color:rgba(245,158,11,0.5);"></i> Processing Progress
+            </h3>
+            <span class="status-badge-large status-{{ job.status }}">{{ job.status }}</span>
+        </div>
+
+        <div class="progress-bar-large mb-2">
+            <div class="progress-fill-large" id="progressFill" data-progress="{{ job.progress or 0 }}"></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#475569;margin-top:0.25rem;">
+            <span style="font-family:'JetBrains Mono',monospace;">
+                <i class="fas fa-check-circle text-emerald-600/50 mr-1"></i>
+                <span id="chunksDone">{{ job.chunks_done or 0 }}</span>/<span id="totalChunks">{{ job.total_chunks or 0 }}</span> chunks
+            </span>
+            <span id="statusMessage" style="color:#64748b;">{{ job.message or 'Processing…' }}</span>
+        </div>
+    </div>
+
+    <!-- Job Details -->
+    <div class="glass-card p-5 mb-4">
+        <div style="font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#475569;display:flex;align-items:center;gap:0.4rem;margin-bottom:1rem;">
+            <i class="fas fa-info-circle" style="color:rgba(245,158,11,0.4);"></i> Job Details
+        </div>
+
+        <div class="detail-row">
+            <span class="detail-label"><i class="fas fa-file-alt mr-1.5" style="color:rgba(245,158,11,0.3);font-size:0.7rem;"></i>Filename</span>
+            <span class="detail-value font-mono text-sm">{{ job.original_file.split('/')[-1] }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label"><i class="fas fa-calendar-plus mr-1.5" style="color:rgba(245,158,11,0.3);font-size:0.7rem;"></i>Created</span>
+            <span class="detail-value text-xs">{{ job.created_at }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label"><i class="fas fa-clock mr-1.5" style="color:rgba(245,158,11,0.3);font-size:0.7rem;"></i>Last Updated</span>
+            <span class="detail-value text-xs" id="lastUpdated">{{ job.updated_at }}</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label"><i class="fas fa-video mr-1.5" style="color:rgba(245,158,11,0.3);font-size:0.7rem;"></i>Generate Video</span>
+            <span class="detail-value">
+                {% if job.generate_video %}
+                    <span style="color:#34d399;"><i class="fas fa-check-circle mr-1" style="font-size:0.75rem;"></i>Yes</span>
+                {% else %}
+                    <span style="color:#374151;"><i class="fas fa-times-circle mr-1" style="font-size:0.75rem;"></i>No</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label"><i class="fas fa-bookmark mr-1.5" style="color:rgba(245,158,11,0.3);font-size:0.7rem;"></i>Detect Chapters</span>
+            <span class="detail-value">
+                {% if job.detect_chapters %}
+                    <span style="color:#34d399;"><i class="fas fa-check-circle mr-1" style="font-size:0.75rem;"></i>Yes</span>
+                {% else %}
+                    <span style="color:#374151;"><i class="fas fa-times-circle mr-1" style="font-size:0.75rem;"></i>No</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Download Section (shown when done) -->
+    <div id="downloadSection" style="display:none;">
+        <div class="glass-card p-6 text-center" style="border:1px solid rgba(16,185,129,0.25);background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(5,150,105,0.03));">
+            <div class="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.25);">
+                <i class="fas fa-check text-emerald-400 text-xl"></i>
+            </div>
+            <h3 class="font-brand font-semibold text-lg text-slate-100 mb-1">Processing Complete!</h3>
+            <p class="text-sm text-slate-500 mb-5">Your audiobook is ready to download</p>
+            <div style="display:flex;gap:0.875rem;justify-content:center;flex-wrap:wrap;">
+                <a href="/api/job/{{ job.id }}/output/audio" class="btn-dl btn-dl-audio">
+                    <i class="fas fa-headphones"></i> Download Audio (MP3)
+                </a>
+                {% if job.generate_video %}
+                <a href="/api/job/{{ job.id }}/output/video" class="btn-dl btn-dl-video">
+                    <i class="fas fa-video"></i> Download Video (MP4)
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Template data — avoids Jinja2 expressions inside <script> (linter-safe) -->
+<script id="pageData" type="application/json">
+{ "jobId": {{ job.id | tojson | safe }} }
+</script>
+
+<script>
+    (function() {
+        const jobId = JSON.parse(document.getElementById('pageData').textContent).jobId;
+        let pollInterval;
+
+        function updateStatus() {
+            fetch(`/api/job/${jobId}`)
+                .then(r => r.json())
+                .then(data => {
+                    // Status badge
+                    const badge = document.querySelector('.status-badge-large');
+                    badge.className = `status-badge status-${data.status} status-badge-large`;
+                    badge.textContent = data.status;
+
+                    // Progress
+                    document.querySelector('.progress-percent').textContent = data.progress + '%';
+                    document.getElementById('progressFill').style.width = data.progress + '%';
+                    document.getElementById('statusMessage').textContent = data.message || 'Processing…';
+                    document.getElementById('chunksDone').textContent = data.chunks_done || 0;
+                    document.getElementById('totalChunks').textContent = data.total_chunks || 0;
+                    if (data.updated_at) document.getElementById('lastUpdated').textContent = data.updated_at;
+
+                    // Chunk label: "LLM Chunks" during cleaning, "TTS Chunks" during synthesis
+                    const chunkLabel = document.getElementById('chunkLabel');
+                    if (chunkLabel) {
+                        if (data.status === 'cleaning') {
+                            chunkLabel.textContent = 'LLM Chunks';
+                        } else if (data.status === 'tts') {
+                            chunkLabel.textContent = 'TTS Chunks';
+                        } else {
+                            chunkLabel.textContent = 'Chunks';
+                        }
+                    }
+
+                    updateMetrics(data);
+
+                    if (data.status === 'done') {
+                        document.getElementById('downloadSection').style.display = 'block';
+                        if (pollInterval) clearInterval(pollInterval);
+                        showToast('Complete!', 'Job finished successfully', 'success');
+                    } else if (data.status === 'failed') {
+                        showToast('Failed', data.message || 'Job failed', 'error');
+                        if (pollInterval) clearInterval(pollInterval);
+                    }
+                })
+                .catch(err => console.error('Status poll error:', err));
+        }
+
+        function updateMetrics(data) {
+            if (data.status === 'tts' && data.total_chunks > 0 && data.chunks_done > 0) {
+                const timePerChunk = data.elapsed_time ? data.elapsed_time / data.chunks_done : 30;
+                const remaining   = (data.total_chunks - data.chunks_done) * timePerChunk;
+                const mins  = Math.floor(remaining / 60);
+                const secs  = Math.floor(remaining % 60);
+                let timeMetric = document.querySelector('.time-metric');
+                if (timeMetric) {
+                    timeMetric.querySelector('.font-mono').textContent = `${mins}m ${secs}s`;
+                }
+            }
+        }
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.id = 'toast-' + Date.now();
+            const icons = { success:'fa-check-circle', error:'fa-exclamation-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+            toast.innerHTML = `<div class="toast-icon"><i class="fas ${icons[type]||icons.info}"></i></div><div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${message}</div></div><button class="toast-close" onclick="this.closest('.toast').remove()"><i class="fas fa-times"></i></button>`;
+            container.appendChild(toast);
+            setTimeout(() => { const t = document.getElementById(toast.id); if(t){ t.style.animation='slideInRight 0.3s reverse'; setTimeout(()=>t.remove(),300); } }, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const fill = document.getElementById('progressFill');
+            if (fill) fill.style.width = (fill.getAttribute('data-progress') || 0) + '%';
+            pollInterval = setInterval(updateStatus, 2000);
+            updateStatus();
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+    })();
+</script>
+{% endblock %}

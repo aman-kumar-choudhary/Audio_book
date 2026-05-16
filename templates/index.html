@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Files{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Upload drop area animation */
+    @keyframes borderDance {
+        0%   { background-position: 0 0, 100% 0, 100% 100%, 0 100%; }
+        100% { background-position: 100% 0, 100% 100%, 0 100%, 0 0; }
+    }
+    @keyframes uploadBounce {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50%       { transform: translateY(-8px) scale(1.05); }
+    }
+    .upload-icon-bounce { animation: uploadBounce 2.5s ease-in-out infinite; }
+
+    .drop-active {
+        border-color: rgba(245,158,11,0.6) !important;
+        background: rgba(245,158,11,0.04) !important;
+    }
+
+    /* Range slider */
+    input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        background: #1e293b;
+        border: none;
+        padding: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px; height: 16px;
+        border-radius: 50%;
+        background: #f59e0b;
+        cursor: pointer;
+        box-shadow: 0 0 6px rgba(245,158,11,0.4);
+        transition: transform 0.15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    /* File card entrance */
+    .file-card { animation: slideUp 0.3s ease-out both; }
+    @keyframes slideUp {
+        from { transform: translateY(12px); opacity: 0; }
+        to   { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Job card */
+    .job-card {
+        background: rgba(12,17,27,0.8);
+        border: 1px solid rgba(51,65,85,0.35);
+        border-radius: 0.875rem;
+        padding: 1.25rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        animation: slideUp 0.35s ease-out both;
+    }
+    .job-card:hover {
+        border-color: rgba(245,158,11,0.25);
+        box-shadow: 0 0 20px rgba(245,158,11,0.05);
+    }
+
+    /* Progress bar track */
+    .progress-track {
+        width: 100%;
+        height: 6px;
+        background: rgba(30,41,59,0.8);
+        border-radius: 9999px;
+        overflow: hidden;
+    }
+
+    /* Btn styles */
+    .btn-amber {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #0a0f1a;
+        font-weight: 600;
+        border-radius: 0.625rem;
+        padding: 0.5rem 1.1rem;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.18s;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-amber:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+
+    .btn-emerald {
+        background: linear-gradient(135deg, #059669, #047857);
+        color: #ecfdf5;
+        font-weight: 600;
+        border-radius: 0.625rem;
+        padding: 0.5rem 1.1rem;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.18s;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-emerald:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(5,150,105,0.3); }
+
+    .btn-ghost {
+        background: rgba(30,41,59,0.6);
+        color: #94a3b8;
+        border: 1px solid rgba(51,65,85,0.4);
+        border-radius: 0.5rem;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: all 0.15s;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-ghost:hover { background: rgba(51,65,85,0.5); color: #e2e8f0; transform: translateY(-1px); }
+
+    .btn-danger {
+        background: rgba(239,68,68,0.12);
+        color: #f87171;
+        border: 1px solid rgba(239,68,68,0.25);
+        border-radius: 0.5rem;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: all 0.15s;
+        cursor: pointer;
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); transform: translateY(-1px); }
+
+    /* Action buttons for job cards */
+    .btn-preview { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s; text-decoration: none; }
+    .btn-preview:hover { background: rgba(249,115,22,0.25); transform: translateY(-1px); }
+    .btn-status  { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s; text-decoration: none; }
+    .btn-status:hover { background: rgba(99,102,241,0.25); transform: translateY(-1px); }
+    .btn-download{ background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s; text-decoration: none; }
+    .btn-download:hover { background: rgba(16,185,129,0.25); transform: translateY(-1px); }
+    .job-action-btn { padding: 0.4rem 0.8rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s; text-decoration: none; }
+
+    /* Section title */
+    .section-title {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.875rem;
+    }
+    .section-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(51,65,85,0.4);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in" style="animation: fadeIn 0.4s ease-out;">
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <div class="flex items-center gap-3 mb-1">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(16,185,129,0.15));border:1px solid rgba(245,158,11,0.25);">
+                <i class="fas fa-magic text-amber-400 text-sm"></i>
+            </div>
+            <div>
+                <h1 class="font-brand font-semibold text-xl text-slate-100 leading-tight">Convert to Audiobook</h1>
+                <p class="text-xs text-slate-500">Upload EPUB or TXT files and let the pipeline do the rest</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Settings Panel -->
+    <div class="glass-card p-5 mb-5" style="border-left:2px solid rgba(245,158,11,0.4);">
+        <div class="section-title"><i class="fas fa-sliders-h text-amber-500/60"></i> Global Settings</div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- AI Model -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-robot text-amber-500/60"></i> AI Model
+                    <span class="ml-auto text-xs px-1.5 py-0.5 rounded-full" style="background:rgba(16,185,129,0.12);color:#34d399;font-size:0.65rem;">OpenRouter</span>
+                </label>
+                <select id="llm_model" name="llm_model" class="text-sm">
+                    <optgroup label="─── OpenRouter — Free ───">
+                        {% for model in gemini_models if model.provider == 'openrouter' and model.free %}
+                        <option value="{{ model.id }}" {% if loop.first %}selected{% endif %}>⚡ {{ model.name }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    <!-- <optgroup label="─── Google Gemini Direct ───">
+                        {% for model in gemini_models if model.provider == 'gemini' %}
+                        <option value="{{ model.id }}">🔵 {{ model.name }}{% if model.free %} (Free){% endif %}</option>
+                        {% endfor %}
+                    </optgroup> -->
+                </select>
+            </div>
+
+            <!-- TTS Engine -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-microphone text-amber-500/60"></i> TTS Engine
+                </label>
+                <select id="tts_engine" name="tts_engine" class="text-sm">
+                    <option value="kokoro">Kokoro (High Quality)</option>
+                </select>
+            </div>
+
+            <!-- Voice -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-user-circle text-amber-500/60"></i> Voice
+                </label>
+                <select id="voice" name="voice" class="text-sm">
+                    <option value="default">Default (Bella — American Female)</option>
+                    <optgroup label="American Female">
+                        <option value="af_bella">Bella</option>
+                        <option value="af_heart">Heart</option>
+                        <option value="af_sarah">Sarah</option>
+                        <option value="af_sky">Sky</option>
+                    </optgroup>
+                    <optgroup label="American Male">
+                        <option value="am_adam">Adam</option>
+                        <option value="am_echo">Echo</option>
+                        <option value="am_liam">Liam</option>
+                    </optgroup>
+                    <optgroup label="British Female">
+                        <option value="bf_emma">Emma</option>
+                        <option value="bf_alice">Alice</option>
+                    </optgroup>
+                    <optgroup label="British Male">
+                        <option value="bm_george">George</option>
+                        <option value="bm_daniel">Daniel</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Custom Voice -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-microphone-alt text-amber-500/60"></i> Custom Voice ID
+                </label>
+                <input type="text" id="custom_voice" name="custom_voice" placeholder="e.g. af_bella, am_adam (overrides above)">
+            </div>
+
+            <!-- Speed -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-tachometer-alt text-amber-500/60"></i> Speed
+                    <span class="ml-auto font-mono text-amber-400 text-xs px-1.5 py-0.5 rounded" style="background:rgba(245,158,11,0.1);" id="speedValue">1.0x</span>
+                </label>
+                <input type="range" id="speed" name="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+
+            <!-- Pitch -->
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-music text-amber-500/60"></i> Pitch
+                    <span class="ml-auto font-mono text-amber-400 text-xs px-1.5 py-0.5 rounded" style="background:rgba(245,158,11,0.1);" id="pitchValue">1.0x</span>
+                </label>
+                <input type="range" id="pitch" name="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+        </div>
+
+        <!-- Cleanup Prompt -->
+        <div class="mt-4">
+            <label class="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+                <i class="fas fa-pen-fancy text-amber-500/60"></i> Default Cleanup Prompt
+            </label>
+            <textarea id="defaultPrompt" rows="2" placeholder="Enter cleanup instructions...">Remove copyright page, table of contents, index, acknowledgments, and bibliography. Keep only the main story content with chapter titles.</textarea>
+            <p class="text-xs mt-1.5 flex items-center gap-1" style="color:#475569;">
+                <i class="fas fa-info-circle" style="color:rgba(245,158,11,0.4);"></i>
+                Applied to all files unless overridden per-file
+            </p>
+        </div>
+    </div>
+
+    <!-- Upload Form -->
+    <form id="uploadForm" enctype="multipart/form-data">
+
+        <!-- Drop Zone -->
+        <div id="dropArea" class="glass-card mb-5 text-center cursor-pointer transition-all duration-250" style="border:2px dashed rgba(51,65,85,0.5);padding:2.5rem 2rem;" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon-bounce inline-block mb-3">
+                <div class="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style="background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(16,185,129,0.08));border:1px solid rgba(245,158,11,0.2);">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-amber-400"></i>
+                </div>
+            </div>
+            <h3 class="font-semibold text-slate-200 text-base mb-1">Drag &amp; Drop files here</h3>
+            <p class="text-slate-500 text-sm mb-3">or click to browse</p>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style="background:rgba(245,158,11,0.1);color:#fbbf24;border:1px solid rgba(245,158,11,0.2);">
+                <i class="fas fa-file-alt"></i> .epub &nbsp;·&nbsp; .txt &nbsp;·&nbsp; Multiple files supported
+            </div>
+            <input type="file" id="fileInput" name="files" multiple accept=".epub,.txt" style="display:none;">
+        </div>
+
+        <!-- Files Grid -->
+        <div class="files-grid grid gap-3 mb-4" id="filesGrid"></div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="submitBtn" disabled style="width:100%;padding:0.875rem;border:none;cursor:pointer;border-radius:0.875rem;font-size:1rem;font-weight:600;background:linear-gradient(135deg,#059669,#047857);color:#ecfdf5;display:flex;align-items:center;justify-content:center;gap:0.6rem;transition:all 0.2s;margin-bottom:1.5rem;letter-spacing:0.01em;opacity:0.45;">
+            <i class="fas fa-play text-sm"></i>
+            <span>Start Processing All Files</span>
+            <i class="fas fa-arrow-right text-sm" style="margin-left:auto;"></i>
+        </button>
+    </form>
+
+    <!-- Active Jobs Dashboard -->
+    <div class="glass-card p-5" id="jobsDashboard">
+        <div class="section-title"><i class="fas fa-chart-line text-emerald-500/60"></i> Processing Jobs</div>
+        <div class="jobs-grid grid gap-3" id="jobsGrid">
+            <div class="text-center py-8" style="color:#334155;">
+                <i class="fas fa-inbox text-3xl mb-2 block" style="color:#1e293b;"></i>
+                <p class="text-sm">No active jobs — upload files to begin</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- File Item Template -->
+<template id="fileItemTemplate">
+    <div class="file-card" style="background:rgba(12,17,27,0.8);border:1px solid rgba(51,65,85,0.35);border-radius:0.875rem;padding:1.1rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.875rem;padding-bottom:0.875rem;border-bottom:1px solid rgba(30,41,59,0.6);">
+            <div style="width:36px;height:36px;border-radius:0.5rem;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-file-alt text-amber-400" style="font-size:0.85rem;"></i>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <span class="file-name" style="font-weight:600;font-size:0.85rem;color:#e2e8f0;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span class="file-size" style="color:#475569;font-size:0.75rem;"></span>
+            </div>
+            <button type="button" class="btn-danger" style="border-radius:50%;width:28px;height:28px;padding:0;justify-content:center;flex-shrink:0;" onclick="removeFile(this)">
+                <i class="fas fa-times" style="font-size:0.7rem;"></i>
+            </button>
+        </div>
+
+        <div style="display:grid;gap:0.625rem;">
+            <div>
+                <label style="font-size:0.75rem;color:#64748b;font-weight:500;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.375rem;">
+                    <i class="fas fa-pen" style="color:rgba(245,158,11,0.5);font-size:0.65rem;"></i> Custom Prompt
+                </label>
+                <textarea class="file-prompt" rows="2" placeholder="Custom prompt for this file (optional)" style="font-size:0.8rem;"></textarea>
+            </div>
+
+            <div>
+                <label style="font-size:0.75rem;color:#64748b;font-weight:500;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.375rem;">
+                    <i class="fas fa-image" style="color:rgba(245,158,11,0.5);font-size:0.65rem;"></i> Thumbnail <span style="color:#334155;font-size:0.65rem;margin-left:auto;">Recommended: 1280×720</span>
+                </label>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <input type="file" class="file-thumbnail" accept=".jpg,.jpeg,.png" style="flex:1;">
+                    <button type="button" class="btn-ghost" style="flex-shrink:0;white-space:nowrap;" onclick="clearThumbnail(this)">
+                        <i class="fas fa-times" style="font-size:0.65rem;"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.8rem;color:#94a3b8;">
+                    <input type="checkbox" class="file-detect-chapters" checked style="width:14px;height:14px;accent-color:#f59e0b;">
+                    <i class="fas fa-bookmark" style="color:rgba(245,158,11,0.5);font-size:0.65rem;"></i> Detect Chapters
+                </label>
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.8rem;color:#94a3b8;">
+                    <input type="checkbox" class="file-generate-video" style="width:14px;height:14px;accent-color:#f59e0b;">
+                    <i class="fas fa-video" style="color:rgba(245,158,11,0.5);font-size:0.65rem;"></i> Generate Video
+                </label>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Job Card Template -->
+<template id="jobCardTemplate">
+    <div class="job-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;gap:0.75rem;">
+            <span class="job-filename" style="font-weight:600;font-size:0.85rem;color:#e2e8f0;display:flex;align-items:center;gap:0.5rem;min-width:0;flex:1;">
+                <i class="fas fa-file text-amber-500/60" style="font-size:0.75rem;flex-shrink:0;"></i>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+            </span>
+            <span class="job-status-badge"></span>
+        </div>
+
+        <div style="margin:0.625rem 0;">
+            <div class="progress-track">
+                <div class="progress-fill" style="width:0%;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:0.3rem;">
+                <span class="job-progress-text" style="font-size:0.75rem;font-family:'JetBrains Mono',monospace;color:#64748b;">0%</span>
+                <span class="job-stage" style="font-size:0.75rem;color:#64748b;"></span>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.375rem;padding:0.625rem;background:rgba(15,20,30,0.5);border-radius:0.5rem;margin:0.5rem 0;">
+            <div>
+                <span style="font-size:0.7rem;color:#374151;">Chunks</span>
+                <div style="font-size:0.8rem;font-weight:600;color:#94a3b8;font-family:'JetBrains Mono',monospace;">
+                    <span class="chunks-done">0</span><span style="color:#374151;">/</span><span class="chunks-total">0</span>
+                </div>
+            </div>
+            <div>
+                <span style="font-size:0.7rem;color:#374151;">Message</span>
+                <div class="job-message" style="font-size:0.75rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            </div>
+        </div>
+
+        <div class="job-actions" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.625rem;">
+            <a href="#" class="job-action-btn btn-preview" style="display:none;">
+                <i class="fas fa-eye" style="font-size:0.7rem;"></i> Preview
+            </a>
+            <a href="#" class="job-action-btn btn-status">
+                <i class="fas fa-info-circle" style="font-size:0.7rem;"></i> Details
+            </a>
+            <div class="job-downloads" style="display:none;margin-left:auto;display:flex;gap:0.4rem;">
+                <a href="#" class="job-action-btn btn-download">
+                    <i class="fas fa-headphones" style="font-size:0.7rem;"></i> Audio
+                </a>
+                <a href="#" class="job-action-btn btn-download" style="display:none;">
+                    <i class="fas fa-video" style="font-size:0.7rem;"></i> Video
+                </a>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function() {
+        const speedInput  = document.getElementById('speed');
+        const pitchInput  = document.getElementById('pitch');
+        const speedValue  = document.getElementById('speedValue');
+        const pitchValue  = document.getElementById('pitchValue');
+        const dropArea    = document.getElementById('dropArea');
+        const fileInput   = document.getElementById('fileInput');
+        const filesGrid   = document.getElementById('filesGrid');
+        const submitBtn   = document.getElementById('submitBtn');
+        const uploadForm  = document.getElementById('uploadForm');
+        const fileTemplate= document.getElementById('fileItemTemplate');
+        const jobTemplate = document.getElementById('jobCardTemplate');
+        const jobsGrid    = document.getElementById('jobsGrid');
+
+        let selectedFiles  = [];
+        let pollIntervals  = {};
+
+        // Range sliders
+        if (speedInput && speedValue) {
+            speedInput.addEventListener('input', e => { speedValue.textContent = parseFloat(e.target.value).toFixed(1) + 'x'; });
+        }
+        if (pitchInput && pitchValue) {
+            pitchInput.addEventListener('input', e => { pitchValue.textContent = parseFloat(e.target.value).toFixed(1) + 'x'; });
+        }
+
+        // Drop zone
+        if (dropArea) {
+            ['dragenter','dragover'].forEach(e => {
+                dropArea.addEventListener(e, ev => { ev.preventDefault(); dropArea.classList.add('drop-active'); });
+            });
+            ['dragleave','drop'].forEach(e => {
+                dropArea.addEventListener(e, ev => {
+                    ev.preventDefault();
+                    dropArea.classList.remove('drop-active');
+                    if (e === 'drop') handleFiles(Array.from(ev.dataTransfer.files));
+                });
+            });
+        }
+
+        if (fileInput) {
+            fileInput.addEventListener('change', e => handleFiles(Array.from(e.target.files)));
+        }
+
+        function handleFiles(files) {
+            const valid = files.filter(f => f.name.match(/\.(epub|txt)$/i));
+            if (valid.length !== files.length) {
+                showToast('Invalid Files', 'Only .epub and .txt files are supported', 'warning');
+            }
+            valid.forEach(addFile);
+            updateSubmitButton();
+        }
+
+        function addFile(file) {
+            if (selectedFiles.find(f => f.name === file.name && f.size === file.size)) return;
+            selectedFiles.push(file);
+
+            const clone = fileTemplate.content.cloneNode(true);
+            clone.querySelector('.file-name').textContent = file.name;
+            clone.querySelector('.file-size').textContent = formatFileSize(file.size);
+
+            // Clear empty state
+            const empty = filesGrid.querySelector('.text-center');
+            if (empty) empty.remove();
+
+            filesGrid.appendChild(clone);
+        }
+
+        window.removeFile = function(btn) {
+            const card = btn.closest('.file-card');
+            const name = card.querySelector('.file-name').textContent;
+            selectedFiles = selectedFiles.filter(f => f.name !== name);
+            card.style.animation = 'slideUp 0.25s reverse ease-in';
+            setTimeout(() => card.remove(), 220);
+            updateSubmitButton();
+        };
+
+        window.clearThumbnail = function(btn) {
+            const input = btn.closest('div').querySelector('.file-thumbnail');
+            if (input) input.value = '';
+        };
+
+        function updateSubmitButton() {
+            const hasFiles = selectedFiles.length > 0;
+            submitBtn.disabled = !hasFiles;
+            submitBtn.style.opacity = hasFiles ? '1' : '0.45';
+            submitBtn.style.cursor = hasFiles ? 'pointer' : 'not-allowed';
+            submitBtn.style.boxShadow = hasFiles ? '0 4px 20px rgba(5,150,105,0.25)' : 'none';
+        }
+
+        // Form submit
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (selectedFiles.length === 0) return;
+
+                const formData = new FormData();
+                const globalPrompt = document.getElementById('defaultPrompt').value;
+
+                formData.append('llm_model',    document.getElementById('llm_model').value);
+                formData.append('tts_engine',   document.getElementById('tts_engine').value);
+                formData.append('voice',        document.getElementById('voice').value);
+                formData.append('custom_voice', document.getElementById('custom_voice').value);
+                formData.append('speed',        document.getElementById('speed').value);
+                formData.append('pitch',        document.getElementById('pitch').value);
+                formData.append('global_prompt',globalPrompt);
+
+                const fileCards = document.querySelectorAll('.file-card');
+                for (let i = 0; i < fileCards.length; i++) {
+                    const card = fileCards[i];
+                    const fileName = card.querySelector('.file-name').textContent;
+                    const file = selectedFiles.find(f => f.name === fileName);
+                    if (file) {
+                        formData.append('files', file);
+                        formData.append(`prompt_${i}`, card.querySelector('.file-prompt').value || globalPrompt);
+                        const thumb = card.querySelector('.file-thumbnail').files[0];
+                        if (thumb) formData.append(`thumbnail_${i}`, thumb);
+                        formData.append(`detect_chapters_${i}`, card.querySelector('.file-detect-chapters').checked ? 'on' : 'off');
+                        formData.append(`generate_video_${i}`,  card.querySelector('.file-generate-video').checked  ? 'on' : 'off');
+                    }
+                }
+
+                submitBtn.disabled = true;
+                const btnSpan = submitBtn.querySelector('span');
+                const originalText = btnSpan ? btnSpan.textContent : '';
+                if (btnSpan) btnSpan.textContent = 'Uploading...';
+                const firstIcon = submitBtn.querySelector('i:first-child');
+                if (firstIcon) firstIcon.className = 'fas fa-spinner fa-pulse text-sm';
+
+                try {
+                    showToast('Upload Started', 'Your files are being uploaded…', 'info');
+                    const response = await fetch('/api/upload-multiple', { method: 'POST', body: formData });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        showToast('Success!', 'Files uploaded — processing started', 'success');
+                        document.querySelectorAll('.file-card').forEach((card, i) => {
+                            setTimeout(() => { card.style.animation = 'slideUp 0.25s reverse ease-in'; setTimeout(() => card.remove(), 220); }, i * 80);
+                        });
+                        selectedFiles = [];
+
+                        // Clear empty state from jobsGrid
+                        const emptyState = jobsGrid.querySelector('.text-center');
+                        if (emptyState) emptyState.remove();
+
+                        data.jobs.forEach(job => addJobToDashboard(job));
+                        startPollingAllJobs(data.jobs.map(j => j.job_id));
+                    } else {
+                        showToast('Error', data.error || 'Upload failed', 'error');
+                    }
+                } catch (err) {
+                    showToast('Error', err.message, 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    if (btnSpan) btnSpan.textContent = originalText;
+                    const fi2 = submitBtn.querySelector('i:first-child');
+                    if (fi2) fi2.className = 'fas fa-play text-sm';
+                    updateSubmitButton();
+                }
+            });
+        }
+
+        function addJobToDashboard(job) {
+            const clone = jobTemplate.content.cloneNode(true);
+            const jobCard = clone.querySelector('.job-card');
+            jobCard.id = `job-${job.job_id}`;
+            clone.querySelector('.job-filename span').textContent = job.filename;
+            const badge = clone.querySelector('.job-status-badge');
+            badge.textContent = 'uploaded';
+            badge.className = 'job-status-badge status-uploaded';
+            const statusLink = clone.querySelector('.btn-status');
+            statusLink.href = `/status/${job.job_id}`;
+            jobsGrid.prepend(clone);
+        }
+
+        function updateJobInDashboard(jobId, data) {
+            const jobCard = document.getElementById(`job-${jobId}`);
+            if (!jobCard) return;
+            const badge = jobCard.querySelector('.job-status-badge');
+            badge.textContent = data.status;
+            badge.className = `job-status-badge status-${data.status}`;
+            const progressFill = jobCard.querySelector('.progress-fill');
+            const progressText = jobCard.querySelector('.job-progress-text');
+            progressFill.style.width = `${data.progress}%`;
+            progressText.textContent = `${data.progress}%`;
+            const stageEl = jobCard.querySelector('.job-stage');
+            const stages = { tts: '<i class="fas fa-microphone-alt"></i> Generating speech…', extracting: '<i class="fas fa-file-export"></i> Extracting…', cleaning: '<i class="fas fa-broom"></i> Cleaning text…', preview: '<i class="fas fa-eye"></i> Ready for preview', done: '<i class="fas fa-check-circle"></i> Complete!' };
+            stageEl.innerHTML = stages[data.status] || (data.message || data.status);
+            jobCard.querySelector('.chunks-done').textContent = data.chunks_done || 0;
+            jobCard.querySelector('.chunks-total').textContent = data.total_chunks || 0;
+            const messageEl = jobCard.querySelector('.job-message');
+            if (data.message) messageEl.textContent = data.message;
+            const previewBtn = jobCard.querySelector('.btn-preview');
+            if (data.status === 'preview') { previewBtn.style.display = 'inline-flex'; previewBtn.href = `/preview/${jobId}`; }
+            else { previewBtn.style.display = 'none'; }
+            const downloads = jobCard.querySelector('.job-downloads');
+            if (data.status === 'done') {
+                downloads.style.display = 'flex';
+                const audioBtn = downloads.querySelector('a:first-child');
+                const videoBtn = downloads.querySelector('a:last-child');
+                audioBtn.href = `/api/job/${jobId}/output/audio`;
+                if (data.generate_video) { videoBtn.style.display = 'inline-flex'; videoBtn.href = `/api/job/${jobId}/output/video`; }
+                if (pollIntervals[jobId]) { clearInterval(pollIntervals[jobId]); delete pollIntervals[jobId]; }
+                showToast('Job Complete', `Processing finished for ${data.filename}`, 'success');
+            } else if (data.status === 'failed') {
+                showToast('Job Failed', data.message || 'Processing failed', 'error');
+                if (pollIntervals[jobId]) { clearInterval(pollIntervals[jobId]); delete pollIntervals[jobId]; }
+            }
+        }
+
+        function startPollingAllJobs(jobIds) {
+            jobIds.forEach(jobId => {
+                if (pollIntervals[jobId]) return;
+                pollIntervals[jobId] = setInterval(async () => {
+                    try {
+                        const response = await fetch(`/api/job/${jobId}`);
+                        const data = await response.json();
+                        updateJobInDashboard(jobId, data);
+                        if (['done','failed'].includes(data.status)) { clearInterval(pollIntervals[jobId]); delete pollIntervals[jobId]; }
+                    } catch (err) { console.error(`Poll error ${jobId}:`, err); }
+                }, 2000);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B','KB','MB','GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.id = 'toast-' + Date.now();
+            const icons = { success:'fa-check-circle', error:'fa-exclamation-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+            toast.innerHTML = `<div class="toast-icon"><i class="fas ${icons[type]||icons.info}"></i></div><div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${message}</div></div><button class="toast-close" onclick="this.closest('.toast').remove()"><i class="fas fa-times"></i></button>`;
+            container.appendChild(toast);
+            setTimeout(() => { const t = document.getElementById(toast.id); if(t){ t.style.animation='slideInRight 0.3s reverse'; setTimeout(()=>t.remove(),300); } }, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => console.log('Audiobook Pipeline UI loaded ✓'));
+    })();
+</script>
+{% endblock %}
